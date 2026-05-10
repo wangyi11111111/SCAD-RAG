@@ -13,9 +13,11 @@ RAG hallucination is not only a generation problem. It is an evidence-use proble
 - **Sufficient Context Gate:** estimates whether retrieved evidence is enough to judge a claim.
 - **SCAD Score:** combines relevance, entailment, contradiction, coverage, and sufficient-context signals.
 - **Operational Counterfactual Evidence Probing:** removes the best evidence, replaces it with a hard negative, and probes conflict to compute score-sensitivity diagnostics such as EDD and HNRG.
-- **Risk-Calibrated Attribution:** outputs hallucination decisions, attribution labels, uncertainty, and risk scores.
+- **Risk-Calibrated Attribution:** outputs hallucination decisions, attribution labels, uncertainty, NLI reliability, and risk scores.
 
 The term counterfactual is used operationally: SCAD-RAG performs controlled evidence-set perturbations to test score robustness. It does not claim formal causal identification.
+
+Hard negatives are selected without gold labels in default inference. The selector ranks semantically related candidates by relevance, weak entailment, low coverage, and contradiction tendency, then falls back to a low-relevance distractor if no suitable candidate exists. Contradiction attribution is guarded by an NLI reliability gate so high-neutral or low-coverage cases abstain instead of being forced into fine-grained labels.
 
 ## Features
 

@@ -15,11 +15,16 @@ thresholds:
   contradiction_threshold: 0.55
   low_relevance_threshold: 0.25
   coverage_threshold: 0.35
+  neutral_threshold: 0.70
+  nli_reliability_threshold: 0.45
+  contradiction_min_coverage: 0.35
+  contradiction_max_neutral: 0.65
   uncertainty_threshold: 0.65
   risk_threshold: 0.70
   min_dependency_delta: 0.10
   min_hard_negative_gap: 0.10
   max_hard_negative_candidates: 8
+  hard_negative_min_relevance: 0.25
 scad_weights:
   alpha: 0.25
   beta: 0.35

@@ -1,10 +1,16 @@
-"""Hard negative evidence selection."""
+"""Hard negative evidence selection.
+
+The selector intentionally avoids gold labels in prediction mode. It first
+keeps semantically close candidates, then prefers candidates that remain
+related to the claim but are weakly entailing or contradictory under the local
+NLI model. This makes the hard-negative view a reproducible robustness probe
+rather than a label-leaking replacement.
+"""
 
 from __future__ import annotations
 
 from scad_rag.features.coverage import keyword_coverage
 from scad_rag.features.lexical_overlap import lexical_relevance
-from scad_rag.features.sufficient_context import evaluate_sufficient_context
 from scad_rag.schema import Evidence
 
 
@@ -21,7 +27,7 @@ def select_hard_negative(
     """Select replacement evidence for counterfactual hard-negative auditing.
 
     Strategies:
-    - hard_negative: high relevance and low lexical coverage, without gold labels by default.
+    - hard_negative: high relevance, weak entailment, and limited coverage, without gold labels by default.
     - low_relevance: least relevant candidate.
     - random: deterministic first candidate after caller-side seeding/sorting.
     """
@@ -40,14 +46,27 @@ def select_hard_negative(
     if len(pool) > max_candidates:
         pool = sorted(pool, key=lambda ev: lexical_relevance(claim_text, ev.text), reverse=True)[:max_candidates]
     scored = []
+    min_relevance = float(thresholds.get("hard_negative_min_relevance", thresholds.get("low_relevance_threshold", 0.25)))
+    coverage_threshold = float(thresholds.get("coverage_threshold", 0.35))
     for ev in pool:
         relevance = float(embedder.score_pair(claim_text, ev.text))
         coverage = keyword_coverage(claim_text, ev.text)
-        unsupported_bonus = 1.0 if coverage < float(thresholds.get("coverage_threshold", 0.35)) else 0.0
-        scored.append((unsupported_bonus, relevance, ev))
-    scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
-    chosen = scored[0]
-    if chosen[0] <= 0.0:
+        if relevance < min_relevance:
+            continue
+        nli = nli_model.score_pair(ev.text, claim_text)
+        low_coverage = 1.0 if coverage < coverage_threshold else max(0.0, 1.0 - coverage)
+        weak_entailment = 1.0 - float(nli.entailment)
+        # Keep the candidate close to the claim but unsupported by relation evidence.
+        hard_negative_score = (
+            0.45 * relevance
+            + 0.25 * weak_entailment
+            + 0.20 * low_coverage
+            + 0.10 * float(nli.contradiction)
+        )
+        scored.append((hard_negative_score, relevance, ev))
+    if not scored:
         low = min(((float(embedder.score_pair(claim_text, ev.text)), ev) for ev in candidates), key=lambda item: item[0])
         return low[1], low[0]
+    scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    chosen = scored[0]
     return chosen[2], chosen[1]

@@ -60,6 +60,7 @@ PREDICTION_COLUMNS = [
     "has_conflicting_evidence",
     "uncertainty_score",
     "risk_score",
+    "nli_reliability_score",
     "explanation",
 ]
 
@@ -129,6 +130,7 @@ def run_experiment(config: dict, method: str, run_dir: str | Path | None = None,
                 "has_conflicting_evidence": audit.has_conflicting_evidence,
                 "uncertainty_score": audit.uncertainty_score,
                 "risk_score": audit.risk_score,
+                "nli_reliability_score": audit.nli_reliability_score,
                 "explanation": explanation,
                 "dependency_stability_label": audit.dependency_stability_label,
                 "max_contradiction_score": audit.max_contradiction_score,
@@ -138,7 +140,7 @@ def run_experiment(config: dict, method: str, run_dir: str | Path | None = None,
             predictions.append(row)
             context_rows.append({"sample_id": claim.sample_id, "claim_id": claim.claim_id, "gold_context_status": claim.gold_context_status, "pred_context_status": audit.context_status_original, "sufficient_context_score": audit.sufficient_context_score})
             audit_rows.append({key: row[key] for key in ["sample_id", "claim_id", "score_original", "score_removed", "score_hard_negative", "evidence_dependency_delta", "hard_negative_robustness_gap", "has_conflicting_evidence", "dependency_stability_label", "max_contradiction_score", "contradiction_evidence_id", "contradiction_evidence_text"]})
-            risk_rows.append({"sample_id": claim.sample_id, "claim_id": claim.claim_id, "uncertainty_score": audit.uncertainty_score, "risk_score": audit.risk_score, "pred_relation": pred_relation, "pred_hallucination": pred_hall, "pred_attribution": pred_attr})
+            risk_rows.append({"sample_id": claim.sample_id, "claim_id": claim.claim_id, "uncertainty_score": audit.uncertainty_score, "risk_score": audit.risk_score, "nli_reliability_score": audit.nli_reliability_score, "pred_relation": pred_relation, "pred_hallucination": pred_hall, "pred_attribution": pred_attr})
             evidence_rows.extend(_evidence_rows(row, audit))
     metrics = compute_metrics(predictions)
     dump_yaml(runtime, run_path / "config_used.yaml")

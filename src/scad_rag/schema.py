@@ -146,6 +146,7 @@ class AuditResult:
     dependency_stability_label: str = "Unknown"
     uncertainty_score: float = 0.0
     risk_score: float = 0.0
+    nli_reliability_score: float = 1.0
     evidence_scores: list[EvidenceScore] = field(default_factory=list)
 
 

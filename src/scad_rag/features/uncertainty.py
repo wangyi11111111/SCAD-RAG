@@ -37,6 +37,29 @@ def compute_uncertainty(
     return max(0.0, min(1.0, value))
 
 
+def nli_reliability_score(
+    entailment: float,
+    neutral: float,
+    contradiction: float,
+    coverage: float,
+    thresholds: dict,
+) -> float:
+    """Estimate whether the local NLI signal is reliable for downstream attribution.
+
+    High entropy, high neutral probability, and low lexical coverage are treated
+    as signs that the relation decision is under-specified. The score is not a
+    learned probability; it is a transparent gate used to prevent error
+    propagation from weak NLI regions into fine-grained attribution labels.
+    """
+    entropy = nli_entropy(entailment, neutral, contradiction)
+    coverage_threshold = float(thresholds.get("coverage_threshold", 0.35))
+    neutral_threshold = float(thresholds.get("neutral_threshold", 0.70))
+    low_coverage_penalty = max(0.0, (coverage_threshold - coverage) / max(coverage_threshold, 1e-9))
+    high_neutral_penalty = max(0.0, (neutral - neutral_threshold) / max(1.0 - neutral_threshold, 1e-9))
+    value = 1.0 - (0.45 * entropy + 0.30 * high_neutral_penalty + 0.25 * low_coverage_penalty)
+    return max(0.0, min(1.0, value))
+
+
 def compute_risk(
     uncertainty_score: float,
     sufficient_context_score: float,
@@ -44,11 +67,20 @@ def compute_risk(
     hard_negative_robustness_gap: float,
     dependency_stability_label: str,
     thresholds: dict,
+    nli_reliability: float = 1.0,
 ) -> float:
     """Compute risk score for abstention."""
     min_gap = float(thresholds.get("min_hard_negative_gap", 0.10))
     unstable = 1.0 if dependency_stability_label == "Unstable" else 0.0
     low_sc = 1.0 - sufficient_context_score
     low_gap = 1.0 if hard_negative_robustness_gap < min_gap else 0.0
-    value = 0.35 * uncertainty_score + 0.25 * low_sc + 0.20 * contradiction_score + 0.10 * low_gap + 0.10 * unstable
+    low_nli_reliability = 1.0 - nli_reliability
+    value = (
+        0.30 * uncertainty_score
+        + 0.20 * low_sc
+        + 0.18 * contradiction_score
+        + 0.10 * low_gap
+        + 0.10 * unstable
+        + 0.12 * low_nli_reliability
+    )
     return max(0.0, min(1.0, value))

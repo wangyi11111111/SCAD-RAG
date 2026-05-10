@@ -9,7 +9,7 @@ from scad_rag.features.evidence_sufficiency import compute_scad_score
 from scad_rag.features.hard_negative import select_hard_negative
 from scad_rag.features.relevance import rank_evidences
 from scad_rag.features.sufficient_context import evaluate_sufficient_context
-from scad_rag.features.uncertainty import compute_risk, compute_uncertainty
+from scad_rag.features.uncertainty import compute_risk, compute_uncertainty, nli_reliability_score
 from scad_rag.schema import AuditResult, ClaimRecord, Evidence, EvidenceScore
 
 
@@ -85,6 +85,13 @@ def audit_claim(
     stability = dependency_stability(score_original, edd, hnrg, thresholds)
     uncertainty = 0.0
     risk = 0.0
+    nli_reliability = nli_reliability_score(
+        best.entailment_score,
+        best.neutral_score,
+        best.contradiction_score,
+        best.coverage_score,
+        thresholds,
+    )
     if risk_config.get("enabled", True):
         uncertainty = compute_uncertainty(
             best.entailment_score,
@@ -97,7 +104,15 @@ def audit_claim(
             hnrg,
             has_conflict,
         )
-        risk = compute_risk(uncertainty, best.sufficient_context_score, best.contradiction_score, hnrg, stability, thresholds)
+        risk = compute_risk(
+            uncertainty,
+            best.sufficient_context_score,
+            best.contradiction_score,
+            hnrg,
+            stability,
+            thresholds,
+            nli_reliability,
+        )
     return AuditResult(
         best_evidence_id=best.evidence_id,
         best_evidence_text=best.evidence_text,
@@ -126,6 +141,7 @@ def audit_claim(
         dependency_stability_label=stability,
         uncertainty_score=uncertainty,
         risk_score=risk,
+        nli_reliability_score=nli_reliability,
         evidence_scores=scores,
     )
 

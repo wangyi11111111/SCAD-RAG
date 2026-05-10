@@ -83,6 +83,7 @@ def _apply_thresholds(rows: list[dict], thresholds: dict, risk_enabled: bool) ->
             has_conflicting_evidence=bool(row.get("has_conflicting_evidence", False)),
             uncertainty_score=float(row.get("uncertainty_score", 0.0) or 0.0),
             risk_score=float(row.get("risk_score", 0.0) or 0.0),
+            nli_reliability_score=float(row.get("nli_reliability_score", 1.0) or 1.0),
         )
         relation, hallucination, attribution, explanation = predict_from_audit(audit, thresholds, risk_enabled)
         updated["pred_relation"] = relation

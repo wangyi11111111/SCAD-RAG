@@ -130,6 +130,7 @@ def _audit_from_row(row: dict) -> AuditResult:
         has_conflicting_evidence=str(row.get("has_conflicting_evidence", "")).lower() in {"true", "1", "yes"},
         uncertainty_score=_float(row.get("uncertainty_score", 0.0)),
         risk_score=_float(row.get("risk_score", 0.0)),
+        nli_reliability_score=_float(row.get("nli_reliability_score", 1.0)),
     )
 
 

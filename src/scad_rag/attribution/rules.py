@@ -12,16 +12,36 @@ def predict_from_audit(audit: AuditResult, thresholds: dict, risk_enabled: bool 
     supported_threshold = float(thresholds.get("supported_threshold", 0.60))
     entailment_threshold = float(thresholds.get("entailment_threshold", 0.50))
     low_relevance = float(thresholds.get("low_relevance_threshold", 0.25))
+    coverage_threshold = float(thresholds.get("coverage_threshold", 0.35))
+    neutral_threshold = float(thresholds.get("neutral_threshold", 0.70))
+    nli_reliability_threshold = float(thresholds.get("nli_reliability_threshold", 0.45))
+    contradiction_min_coverage = float(thresholds.get("contradiction_min_coverage", coverage_threshold))
+    contradiction_max_neutral = float(thresholds.get("contradiction_max_neutral", neutral_threshold))
     min_delta = float(thresholds.get("min_dependency_delta", 0.10))
     min_gap = float(thresholds.get("min_hard_negative_gap", 0.10))
-    if audit.contradiction_score >= contradiction_threshold:
+    nli_unreliable = (
+        audit.nli_reliability_score < nli_reliability_threshold
+        or (audit.neutral_score >= neutral_threshold and audit.coverage_score < coverage_threshold)
+    )
+    robust_contradiction = (
+        audit.contradiction_score >= contradiction_threshold
+        and audit.max_relevance >= low_relevance
+        and audit.coverage_score >= contradiction_min_coverage
+        and audit.neutral_score <= contradiction_max_neutral
+        and audit.nli_reliability_score >= nli_reliability_threshold
+    )
+    if robust_contradiction:
         return "Contradicted", 1, "Evidence-contradicted", "The best evidence directly contradicts the claim."
+    if audit.contradiction_score >= contradiction_threshold and risk_enabled:
+        return "Uncertain", -1, "High-risk-abstain", "A possible contradiction is detected, but NLI reliability or coverage is too weak for a confident contradiction attribution."
     if audit.score_original >= supported_threshold and audit.evidence_dependency_delta < min_delta and audit.hard_negative_robustness_gap < min_gap:
         return "Uncertain", -1, "Unstable-evidence-dependency", "The score is high but barely changes after evidence removal or hard-negative replacement."
     if audit.context_status_original == "Sufficient" and audit.score_original >= supported_threshold:
         return "Supported", 0, "No hallucination", "The current evidence is sufficient and the SCAD score supports the claim."
     if audit.max_relevance < low_relevance:
         return "Insufficient", 1, "Retrieval-insufficient", "Retrieved evidence is weakly related to the claim."
+    if nli_unreliable and risk_enabled:
+        return "Uncertain", -1, "High-risk-abstain", "The evidence is related, but the local NLI signal is high-neutral or low-coverage and is not reliable enough for fine-grained attribution."
     if audit.max_relevance >= low_relevance and audit.entailment_score < entailment_threshold:
         if risk_enabled and should_abstain(audit.uncertainty_score, audit.risk_score, thresholds):
             return "Uncertain", -1, "High-risk-abstain", "The evidence is related but uncertainty/risk is too high for a reliable decision."

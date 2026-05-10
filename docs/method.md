@@ -16,6 +16,14 @@ Each claim is ranked against top-k evidence. `quick_test` uses a dummy lexical e
 
 The NLI model receives `premise = evidence` and `hypothesis = claim`. It emits entailment, neutral, and contradiction scores. `quick_test` uses deterministic dummy rules; default mode uses a local Hugging Face sequence-classification model.
 
+Because lightweight NLI can be unreliable for long, noisy, high-neutral, or low-coverage evidence, SCAD-RAG computes an explicit NLI reliability score:
+
+```text
+Q = 1 - (0.45 * entropy + 0.30 * high_neutral_penalty + 0.25 * low_coverage_penalty)
+```
+
+`Q` is clipped to `[0, 1]`. It is not a calibrated probability; it is a guardrail that prevents low-reliability NLI outputs from being converted into confident contradiction or generation-inconsistent attributions.
+
 ## 5. Sufficient Context Gate
 
 The SC Gate fuses relevance, entailment, contradiction, and coverage. It outputs `Sufficient`, `Insufficient`, `Conflicting`, or `Uncertain`, plus a numeric sufficient-context score. It upgrades simple evidence relatedness into an explicit sufficiency judgment.
@@ -49,13 +57,26 @@ Remove the best evidence and recompute score and context status. `EDD = score_or
 
 Replace the best evidence with a semantically similar unsupported evidence. If no gold hard negative exists, choose evidence with high relevance and low entailment; otherwise fall back to a low-relevance distractor. `HNRG = score_original - score_hard_negative`.
 
+At prediction time the selector never uses `gold_relation`, `gold_hallucination`, `gold_attribution`, or evidence-type annotations when `strict_no_gold_inference=true`. The default score for a candidate `e` is:
+
+```text
+HN(e) = 0.45 * relevance(c,e)
+      + 0.25 * (1 - entailment(c,e))
+      + 0.20 * low_coverage(c,e)
+      + 0.10 * contradiction(c,e)
+```
+
+Candidates below `hard_negative_min_relevance` are ignored, and the system falls back to a low-relevance distractor if no semantically close unsupported candidate is available. This makes the replacement a transparent robustness probe, not a claim of formal causal intervention.
+
 ### Contradiction Probe View
 
 Record contradiction evidence when top-k evidence contains high contradiction.
 
 ## 8. Risk-Calibrated Attribution
 
-SCAD-RAG estimates uncertainty from NLI entropy, threshold closeness, uncertain context, low EDD, low HNRG, and conflict. Risk combines uncertainty with low sufficient-context score, contradiction, low hard-negative gap, and unstable dependency. High-risk cases can abstain.
+SCAD-RAG estimates uncertainty from NLI entropy, threshold closeness, uncertain context, low EDD, low HNRG, and conflict. Risk combines uncertainty with low sufficient-context score, contradiction, low hard-negative gap, unstable dependency, and low NLI reliability. High-risk cases can abstain.
+
+Contradiction attribution now requires a robust contradiction condition: contradiction must exceed the contradiction threshold, relevance must exceed the low-relevance threshold, coverage must exceed `contradiction_min_coverage`, neutral probability must stay below `contradiction_max_neutral`, and NLI reliability must exceed `nli_reliability_threshold`. Otherwise the system abstains instead of forcing `Evidence-contradicted`. This directly mitigates the observed error propagation in high-neutral and low-coverage cases.
 
 ## 9. Baseline Methods
 
@@ -67,4 +88,4 @@ The system is linear in the number of claims times top-k evidence plus hard-nega
 
 ## 11. Limitations
 
-SCAD-RAG uses sentence-level decomposition by default. Hard negative selection is heuristic when labels are unavailable. Risk calibration is rule-based in the first version and should be calibrated on validation data for paper-scale experiments.
+SCAD-RAG uses sentence-level decomposition by default. Hard negative selection is a reproducible robustness probe, but it is still not a formal causal intervention. Risk calibration is rule-based in the transparent variant and should be calibrated on validation data for paper-scale experiments. Low NLI reliability cases are routed to abstention rather than fine-grained attribution when strict reliability gates are enabled.
