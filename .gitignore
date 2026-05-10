@@ -1,0 +1,30 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+*.log
+*.tmp
+*.pt
+*.bin
+*.safetensors
+*.onnx
+*.ckpt
+*.pdf
+*.zip
+
+# Local datasets and generated artifacts
+data/raw/*
+!data/raw/README.md
+data/processed/*
+!data/processed/.gitkeep
+experiments/runs/*
+!experiments/runs/.gitkeep
+experiments/models/*
+!experiments/models/.gitkeep
+
+# Manuscript sources are maintained separately from the code release.
+paper/

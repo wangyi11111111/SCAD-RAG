@@ -1,0 +1,15 @@
+base_config: configs/quick_test.yaml
+dataset: toy
+seed: 42
+output_dir: experiments/runs
+ablations:
+  - full
+  - w_o_sufficient_context
+  - w_o_relevance
+  - w_o_nli
+  - w_o_coverage
+  - w_o_counterfactual
+  - w_o_removal
+  - w_o_hard_negative
+  - w_o_contradiction_probe
+  - w_o_risk_calibration
