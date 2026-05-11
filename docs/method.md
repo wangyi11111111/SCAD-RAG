@@ -2,7 +2,7 @@
 
 ## 1. Task Definition
 
-Given a question, retrieved evidence, and a RAG answer, SCAD-RAG predicts claim-level context status, relation label, hallucination label, attribution label, uncertainty, and risk. The goal is not only hallucination detection but hallucination attribution.
+Given a question, retrieved evidence, and a RAG answer, SCAD-RAG predicts claim-level context status, relation label, hallucination label, attribution label, uncertainty, and risk. The goal is not only hallucination detection but evidence-facing diagnosis: whether a claim is supported, insufficiently grounded, contradicted, or too risky for confident attribution.
 
 ## 2. Claim Decomposition
 
@@ -19,10 +19,12 @@ The NLI model receives `premise = evidence` and `hypothesis = claim`. It emits e
 Because lightweight NLI can be unreliable for long, noisy, high-neutral, or low-coverage evidence, SCAD-RAG computes an explicit NLI reliability score:
 
 ```text
-Q = 1 - (0.45 * entropy + 0.30 * high_neutral_penalty + 0.25 * low_coverage_penalty)
+kappa = 1 - (0.45 * entropy
+             + 0.30 * high_neutral_penalty
+             + 0.25 * low_coverage_penalty)
 ```
 
-`Q` is clipped to `[0, 1]`. It is not a calibrated probability; it is a guardrail that prevents low-reliability NLI outputs from being converted into confident contradiction or generation-inconsistent attributions.
+`kappa` is clipped to `[0, 1]`. It is not a calibrated probability; it is a transparent guardrail that prevents weak NLI regions from becoming confident contradiction attributions.
 
 ## 5. Sufficient Context Gate
 
@@ -45,19 +47,25 @@ The default weights are `0.25`, `0.35`, `0.20`, `0.10`, and `0.10`.
 
 ## 7. Counterfactual Evidence Audit
 
+The term `counterfactual` is used operationally: SCAD-RAG compares score behavior under controlled evidence-set perturbations. It is a robustness probe, not a structural causal intervention.
+
 ### Original Evidence View
 
 Compute `score_original`, `context_status_original`, and the original relation decision.
 
 ### Evidence Removal View
 
-Remove the best evidence and recompute score and context status. `EDD = score_original - score_removed`.
+Remove the best evidence and recompute score and context status:
+
+```text
+EDD = score_original - score_removed
+```
 
 ### Hard Negative Replacement View
 
-Replace the best evidence with a semantically similar unsupported evidence. If no gold hard negative exists, choose evidence with high relevance and low entailment; otherwise fall back to a low-relevance distractor. `HNRG = score_original - score_hard_negative`.
+Replace the best evidence with a semantically similar but weakly supporting candidate. At prediction time the selector never uses `gold_relation`, `gold_hallucination`, `gold_attribution`, or evidence-type annotations when `strict_no_gold_inference=true`.
 
-At prediction time the selector never uses `gold_relation`, `gold_hallucination`, `gold_attribution`, or evidence-type annotations when `strict_no_gold_inference=true`. The default score for a candidate `e` is:
+The default candidate score is:
 
 ```text
 HN(e) = 0.45 * relevance(c,e)
@@ -66,17 +74,21 @@ HN(e) = 0.45 * relevance(c,e)
       + 0.10 * contradiction(c,e)
 ```
 
-Candidates below `hard_negative_min_relevance` are ignored, and the system falls back to a low-relevance distractor if no semantically close unsupported candidate is available. This makes the replacement a transparent robustness probe, not a claim of formal causal intervention.
+Candidates below `hard_negative_min_relevance` are ignored, and the system falls back to a low-relevance distractor if no semantically close unsupported candidate is available:
+
+```text
+HNRG = score_original - score_hard_negative
+```
 
 ### Contradiction Probe View
 
-Record contradiction evidence when top-k evidence contains high contradiction.
+Record contradiction evidence when top-k evidence contains high contradiction. Contradiction attribution is gated by relevance, coverage, neutral probability, and NLI reliability to reduce false contradiction propagation.
 
 ## 8. Risk-Calibrated Attribution
 
-SCAD-RAG estimates uncertainty from NLI entropy, threshold closeness, uncertain context, low EDD, low HNRG, and conflict. Risk combines uncertainty with low sufficient-context score, contradiction, low hard-negative gap, unstable dependency, and low NLI reliability. High-risk cases can abstain.
+SCAD-RAG estimates uncertainty from NLI entropy, threshold closeness, uncertain context, low EDD, low HNRG, and conflict. Risk combines uncertainty with low sufficient-context score, contradiction, low hard-negative gap, unstable dependency, and low NLI reliability.
 
-Contradiction attribution now requires a robust contradiction condition: contradiction must exceed the contradiction threshold, relevance must exceed the low-relevance threshold, coverage must exceed `contradiction_min_coverage`, neutral probability must stay below `contradiction_max_neutral`, and NLI reliability must exceed `nli_reliability_threshold`. Otherwise the system abstains instead of forcing `Evidence-contradicted`. This directly mitigates the observed error propagation in high-neutral and low-coverage cases.
+The final rules prioritize robust contradiction, supported claims, retrieval insufficiency, generation inconsistency, unstable evidence sensitivity, and high-risk abstention. Low-reliability NLI does not automatically cause abstention. Instead, it blocks strong contradiction attribution and falls back to unsupported-claim detection when the evidence is relevant but not entailing. This reduces over-abstention on imbalanced RAGTruth labels while still making the NLI uncertainty visible through risk and explanation fields.
 
 ## 9. Baseline Methods
 
@@ -88,4 +100,4 @@ The system is linear in the number of claims times top-k evidence plus hard-nega
 
 ## 11. Limitations
 
-SCAD-RAG uses sentence-level decomposition by default. Hard negative selection is a reproducible robustness probe, but it is still not a formal causal intervention. Risk calibration is rule-based in the transparent variant and should be calibrated on validation data for paper-scale experiments. Low NLI reliability cases are routed to abstention rather than fine-grained attribution when strict reliability gates are enabled.
+SCAD-RAG uses sentence-level decomposition by default. Hard negative selection is a reproducible robustness probe, but it is not a formal causal intervention. Risk calibration is rule-based in the transparent variant and should be calibrated on validation data for paper-scale experiments. Fine-grained attribution on RAGTruth remains weakly supervised because RAGTruth is primarily a hallucination-span benchmark, not a native attribution dataset.
