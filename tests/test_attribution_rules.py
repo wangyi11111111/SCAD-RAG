@@ -16,9 +16,10 @@ def test_attribution_contradiction():
     assert attribution == "Evidence-contradicted"
 
 
-def test_unreliable_nli_contradiction_abstains():
+def test_unreliable_nli_contradiction_falls_back_to_unsupported():
     audit = AuditResult(
         max_relevance=0.8,
+        entailment_score=0.2,
         neutral_score=0.9,
         contradiction_score=0.7,
         coverage_score=0.1,
@@ -28,13 +29,14 @@ def test_unreliable_nli_contradiction_abstains():
         audit,
         {
             "contradiction_threshold": 0.55,
+            "entailment_threshold": 0.50,
             "low_relevance_threshold": 0.25,
             "coverage_threshold": 0.35,
             "neutral_threshold": 0.70,
             "nli_reliability_threshold": 0.45,
         },
     )
-    assert relation == "Uncertain"
-    assert hallucination == -1
-    assert attribution == "High-risk-abstain"
-    assert "NLI reliability" in explanation
+    assert relation == "Insufficient"
+    assert hallucination == 1
+    assert attribution == "Generation-inconsistent"
+    assert "possible contradiction" in explanation
