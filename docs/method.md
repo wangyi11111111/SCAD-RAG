@@ -88,6 +88,8 @@ Record contradiction evidence when top-k evidence contains high contradiction. C
 
 SCAD-RAG estimates uncertainty from NLI entropy, threshold closeness, uncertain context, low EDD, low HNRG, and conflict. Risk combines uncertainty with low sufficient-context score, contradiction, low hard-negative gap, unstable dependency, and low NLI reliability.
 
+The risk layer follows a selective-prediction view. Given a risk threshold, low-risk claims are retained and high-risk claims can be routed to manual review. EDD and HNRG are local sensitivity features for this risk estimate: if the score barely changes after removing the best evidence or replacing it with a hard negative, the decision is less clearly anchored to evidence and should be treated as riskier. This connects evidence perturbation to risk calibration without claiming formal causal identification.
+
 The final rules prioritize robust contradiction, supported claims, retrieval insufficiency, generation inconsistency, unstable evidence sensitivity, and high-risk abstention. Low-reliability NLI does not automatically cause abstention. Instead, it blocks strong contradiction attribution and falls back to unsupported-claim detection when the evidence is relevant but not entailing. This reduces over-abstention on imbalanced RAGTruth labels while still making the NLI uncertainty visible through risk and explanation fields.
 
 ## 9. Baseline Methods
