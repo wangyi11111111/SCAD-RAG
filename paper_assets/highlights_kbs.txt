@@ -1,0 +1,8 @@
+Highlights
+
+- SCAD-RAG audits whether RAG claims are sufficiently grounded in retrieved evidence.
+- Evidence removal and hard-negative replacement provide score-sensitivity diagnostics.
+- A selective-risk layer links evidence sensitivity to abstention and attribution.
+- Full RAGTruth experiments show gains over similarity, NLI-only, and ESS-rule baselines.
+- FEVER results show that SCAD diagnostic features improve relation attribution.
+

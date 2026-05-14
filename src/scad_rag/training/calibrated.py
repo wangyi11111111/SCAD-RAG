@@ -26,6 +26,15 @@ FEATURE_GROUPS = {
 }
 
 DEFAULT_FEATURES = [feature for group in FEATURE_GROUPS.values() for feature in group]
+BASE_AUDIT_FEATURES = [
+    "relevance_score",
+    "entailment_score",
+    "neutral_score",
+    "contradiction_score",
+    "coverage_score",
+    "sufficient_context_score",
+    "score_original",
+]
 
 
 def run_calibrated_experiment(
@@ -110,6 +119,132 @@ def run_feature_ablation(
     return rows
 
 
+def run_counterfactual_incremental_experiment(
+    train_predictions: str | Path,
+    test_predictions: str | Path,
+    output_dir: str | Path = "experiments/runs/counterfactual_incremental",
+    seed: int = 42,
+) -> Path:
+    """Isolate EDD/HNRG effects with a fixed classifier and fixed base features.
+
+    This experiment answers whether counterfactual perturbation features improve
+    selective risk behavior when the classifier family and all non-perturbation
+    features are held constant. The decision head is always balanced logistic
+    regression, and thresholds are selected only on train-side calibration data.
+    """
+    root = ensure_dir(output_dir)
+    variants = {
+        "base_no_cf": BASE_AUDIT_FEATURES,
+        "base_plus_edd": BASE_AUDIT_FEATURES + ["evidence_dependency_delta"],
+        "base_plus_hnrg": BASE_AUDIT_FEATURES + ["hard_negative_robustness_gap"],
+        "base_plus_edd_hnrg": BASE_AUDIT_FEATURES
+        + ["evidence_dependency_delta", "hard_negative_robustness_gap"],
+    }
+    rows: list[dict[str, Any]] = []
+    curve_rows: list[dict[str, Any]] = []
+    for name, features in variants.items():
+        train_df, x_train, y_train = _load_prediction_features(train_predictions, features)
+        test_df, x_test, y_test = _load_prediction_features(test_predictions, features)
+        selected = _fit_fixed_logreg(x_train, y_train, x_test, y_test, seed)
+        pred_rows = _prediction_rows(test_df, selected)
+        metrics = compute_metrics(pred_rows)
+        rows.append(
+            {
+                "variant": name,
+                "features": ", ".join(features),
+                "threshold": selected["threshold"],
+                "hallucination_f1": metrics.get("hallucination_f1", 0.0),
+                "hallucination_macro_f1": metrics.get("hallucination_macro_f1", 0.0),
+                "hallucination_auroc": metrics.get("hallucination_auroc", 0.0),
+                "precision": metrics.get("precision", 0.0),
+                "recall": metrics.get("recall", 0.0),
+                "accuracy": metrics.get("accuracy", 0.0),
+                "risk_error_correlation": metrics.get("risk_error_correlation", 0.0),
+                "risk_coverage_accuracy_auc": metrics.get("risk_coverage_accuracy_auc", 0.0),
+                "selective_risk_auc": metrics.get("selective_risk_auc", 0.0),
+                "hallucination_ece": metrics.get("hallucination_ece", 0.0),
+                "hallucination_brier": metrics.get("hallucination_brier", 0.0),
+                "num_features": len(features),
+            }
+        )
+        for point in metrics.get("risk_coverage_curve", []):
+            curve_rows.append({"variant": name, **point})
+    write_csv(root / "counterfactual_incremental_report.csv", rows)
+    write_csv(root / "counterfactual_incremental_risk_coverage_curve.csv", curve_rows)
+    (root / "counterfactual_incremental_report.md").write_text(
+        _counterfactual_incremental_report(rows), encoding="utf-8"
+    )
+    (root / "latex_table_counterfactual_incremental.txt").write_text(
+        _counterfactual_incremental_latex(rows), encoding="utf-8"
+    )
+    return root
+
+
+def run_counterfactual_risk_ranking_experiment(
+    train_predictions: str | Path,
+    test_predictions: str | Path,
+    output_dir: str | Path = "experiments/runs/counterfactual_risk_ranking",
+    seed: int = 42,
+) -> Path:
+    """Evaluate EDD/HNRG as risk-ordering probes with fixed predictions.
+
+    The classifier is trained only on the base non-counterfactual feature set.
+    Its predictions are then held fixed while the selective-prediction risk
+    ordering is changed from confidence-only to confidence plus low-EDD and/or
+    low-HNRG penalties. This isolates whether EDD/HNRG help decide which
+    predictions should be reviewed first.
+    """
+    root = ensure_dir(output_dir)
+    train_df, x_train, y_train = _load_prediction_features(train_predictions, BASE_AUDIT_FEATURES)
+    test_df, x_test, y_test = _load_prediction_features(test_predictions, BASE_AUDIT_FEATURES)
+    selected = _fit_fixed_logreg(x_train, y_train, x_test, y_test, seed)
+    probabilities = np.asarray(selected["test_probability"])
+    threshold = float(selected["threshold"])
+    confidence_risk = 1.0 - np.minimum(1.0, np.abs(probabilities - threshold) / max(threshold, 1.0 - threshold, 1e-9))
+    edd = _numeric_array(test_df, "evidence_dependency_delta")
+    hnrg = _numeric_array(test_df, "hard_negative_robustness_gap")
+    low_edd = _low_signal(edd)
+    low_hnrg = _low_signal(hnrg)
+    variants = {
+        "confidence_only": confidence_risk,
+        "confidence_plus_low_edd": np.clip(0.75 * confidence_risk + 0.25 * low_edd, 0.0, 1.0),
+        "confidence_plus_low_hnrg": np.clip(0.75 * confidence_risk + 0.25 * low_hnrg, 0.0, 1.0),
+        "confidence_plus_edd_hnrg": np.clip(0.65 * confidence_risk + 0.175 * low_edd + 0.175 * low_hnrg, 0.0, 1.0),
+    }
+    rows: list[dict[str, Any]] = []
+    curve_rows: list[dict[str, Any]] = []
+    for name, risk_values in variants.items():
+        pred_rows = _prediction_rows(test_df, selected)
+        for idx, row in enumerate(pred_rows):
+            row["risk_score"] = float(risk_values[idx])
+            row["uncertainty_score"] = float(risk_values[idx])
+            row["explanation"] = f"Fixed base classifier; selective risk ordering={name}."
+        metrics = compute_metrics(pred_rows)
+        rows.append(
+            {
+                "risk_variant": name,
+                "threshold": threshold,
+                "hallucination_f1": metrics.get("hallucination_f1", 0.0),
+                "hallucination_macro_f1": metrics.get("hallucination_macro_f1", 0.0),
+                "hallucination_auroc": metrics.get("hallucination_auroc", 0.0),
+                "risk_coverage_accuracy_auc": metrics.get("risk_coverage_accuracy_auc", 0.0),
+                "selective_risk_auc": metrics.get("selective_risk_auc", 0.0),
+                "risk_error_correlation": metrics.get("risk_error_correlation", 0.0),
+            }
+        )
+        for point in metrics.get("risk_coverage_curve", []):
+            curve_rows.append({"risk_variant": name, **point})
+    write_csv(root / "counterfactual_risk_ranking_report.csv", rows)
+    write_csv(root / "counterfactual_risk_ranking_curve.csv", curve_rows)
+    (root / "counterfactual_risk_ranking_report.md").write_text(
+        _counterfactual_risk_ranking_report(rows), encoding="utf-8"
+    )
+    (root / "latex_table_counterfactual_risk_ranking.txt").write_text(
+        _counterfactual_risk_ranking_latex(rows), encoding="utf-8"
+    )
+    return root
+
+
 def _load_prediction_features(path: str | Path, features: list[str]) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series]:
     """Load SCAD prediction CSV into numeric features and hallucination labels."""
     df = pd.read_csv(path)
@@ -180,12 +315,56 @@ def _select_model(x_train: pd.DataFrame, y_train: pd.Series, x_test: pd.DataFram
     return selected, rows
 
 
+def _fit_fixed_logreg(x_train: pd.DataFrame, y_train: pd.Series, x_test: pd.DataFrame, y_test: pd.Series, seed: int) -> dict[str, Any]:
+    """Fit the fixed balanced-logistic head used for incremental feature tests."""
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.model_selection import train_test_split
+    from sklearn.pipeline import make_pipeline
+    from sklearn.preprocessing import StandardScaler
+
+    x_fit, x_cal, y_fit, y_cal = train_test_split(x_train, y_train, test_size=0.25, random_state=seed, stratify=y_train)
+    model = make_pipeline(
+        StandardScaler(),
+        LogisticRegression(max_iter=2000, class_weight="balanced", solver="liblinear", random_state=seed),
+    )
+    model.fit(x_fit, y_fit)
+    cal_prob = _predict_probability(model, x_cal)
+    threshold, cal_f1 = _best_threshold(y_cal, cal_prob)
+    test_prob = _predict_probability(model, x_test)
+    return {
+        "name": "logreg_balanced_fixed",
+        "model": model,
+        "threshold": threshold,
+        "features": list(x_train.columns),
+        "cal_hallucination_f1": cal_f1,
+        "test_probability": test_prob,
+        "test_prediction": (test_prob >= threshold).astype(int),
+    }
+
+
 def _predict_probability(model: Any, x: pd.DataFrame) -> np.ndarray:
     """Return calibrated hallucination probabilities."""
     if hasattr(model, "predict_proba"):
         return np.asarray(model.predict_proba(x)[:, 1])
     scores = np.asarray(model.decision_function(x))
     return (scores - scores.min()) / (scores.max() - scores.min() + 1e-9)
+
+
+def _numeric_array(df: pd.DataFrame, column: str) -> np.ndarray:
+    """Convert a DataFrame column to a numeric numpy array with missing values filled."""
+    if column not in df.columns:
+        return np.zeros(len(df), dtype=float)
+    return pd.to_numeric(df[column], errors="coerce").fillna(0.0).to_numpy(dtype=float)
+
+
+def _low_signal(values: np.ndarray) -> np.ndarray:
+    """Map lower perturbation sensitivity to higher risk contribution."""
+    if values.size == 0:
+        return values
+    clipped = np.clip(values, np.percentile(values, 1), np.percentile(values, 99))
+    lo, hi = float(clipped.min()), float(clipped.max())
+    normalized = (clipped - lo) / (hi - lo + 1e-9)
+    return 1.0 - normalized
 
 
 def _best_threshold(y_true: pd.Series, probabilities: np.ndarray) -> tuple[float, float]:
@@ -306,4 +485,67 @@ def _ablation_latex(rows: list[dict[str, Any]]) -> str:
     lines = ["Ablation & Hall-F1 & Binary Macro-F1 & AUROC & Accuracy \\\\"]
     for row in rows:
         lines.append(f"{row['ablation']} & {float(row['hallucination_f1']):.3f} & {float(row['hallucination_macro_f1']):.3f} & {float(row['hallucination_auroc']):.3f} & {float(row['accuracy']):.3f} \\\\")
+    return "\n".join(lines)
+
+
+def _counterfactual_incremental_report(rows: list[dict[str, Any]]) -> str:
+    """Render the EDD/HNRG incremental report."""
+    lines = [
+        "# Counterfactual Feature Incremental Experiment",
+        "",
+        "Classifier and non-counterfactual features are fixed. The only changes are whether EDD and/or HNRG are added to the base SCAD feature set. Thresholds are tuned on train-side calibration data only.",
+        "",
+        "| Variant | Hall-F1 | Binary Macro-F1 | AUROC | Risk-Cov. Acc. AUC | Sel. Risk AUC | Risk Corr. | ECE | Brier |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
+    ]
+    for row in rows:
+        lines.append(
+            f"| {row['variant']} | {float(row['hallucination_f1']):.4f} | {float(row['hallucination_macro_f1']):.4f} | "
+            f"{float(row['hallucination_auroc']):.4f} | {float(row['risk_coverage_accuracy_auc']):.4f} | "
+            f"{float(row['selective_risk_auc']):.4f} | {float(row['risk_error_correlation']):.4f} | "
+            f"{float(row['hallucination_ece']):.4f} | {float(row['hallucination_brier']):.4f} |"
+        )
+    return "\n".join(lines)
+
+
+def _counterfactual_incremental_latex(rows: list[dict[str, Any]]) -> str:
+    """Render LaTeX rows for the EDD/HNRG incremental experiment."""
+    lines = ["Variant & Hall-F1 & AUROC & Risk-Cov. Acc. AUC & Sel. Risk AUC & Risk Corr. \\\\"]
+    for row in rows:
+        lines.append(
+            f"{row['variant']} & {float(row['hallucination_f1']):.3f} & {float(row['hallucination_auroc']):.3f} & "
+            f"{float(row['risk_coverage_accuracy_auc']):.3f} & {float(row['selective_risk_auc']):.3f} & "
+            f"{float(row['risk_error_correlation']):.3f} \\\\"
+        )
+    return "\n".join(lines)
+
+
+def _counterfactual_risk_ranking_report(rows: list[dict[str, Any]]) -> str:
+    """Render the fixed-prediction EDD/HNRG risk-ranking report."""
+    lines = [
+        "# Counterfactual Risk Ranking Experiment",
+        "",
+        "Classifier predictions are fixed from the base feature head. Only the selective-prediction risk ordering is changed.",
+        "",
+        "| Risk ordering | Hall-F1 | AUROC | Risk-Cov. Acc. AUC | Sel. Risk AUC | Risk Corr. |",
+        "|---|---:|---:|---:|---:|---:|",
+    ]
+    for row in rows:
+        lines.append(
+            f"| {row['risk_variant']} | {float(row['hallucination_f1']):.4f} | "
+            f"{float(row['hallucination_auroc']):.4f} | {float(row['risk_coverage_accuracy_auc']):.4f} | "
+            f"{float(row['selective_risk_auc']):.4f} | {float(row['risk_error_correlation']):.4f} |"
+        )
+    return "\n".join(lines)
+
+
+def _counterfactual_risk_ranking_latex(rows: list[dict[str, Any]]) -> str:
+    """Render LaTeX rows for fixed-prediction risk-ranking diagnostics."""
+    lines = ["Risk ordering & Hall-F1 & AUROC & Risk-Cov. Acc. AUC & Sel. Risk AUC & Risk Corr. \\\\"]
+    for row in rows:
+        lines.append(
+            f"{row['risk_variant']} & {float(row['hallucination_f1']):.3f} & "
+            f"{float(row['hallucination_auroc']):.3f} & {float(row['risk_coverage_accuracy_auc']):.3f} & "
+            f"{float(row['selective_risk_auc']):.3f} & {float(row['risk_error_correlation']):.3f} \\\\"
+        )
     return "\n".join(lines)

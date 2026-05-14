@@ -1,10 +1,12 @@
 # SCAD-RAG
 
-**SCAD-RAG: Sufficient-Context and Counterfactual Audit for RAG Hallucination Attribution**
+**SCAD-RAG: Risk-Calibrated Counterfactual Evidence Auditing for Knowledge-Grounded Retrieval-Augmented Generation**
 
 SCAD-RAG is a local, reproducible research codebase for claim-level hallucination diagnosis in retrieval-augmented generation (RAG). It goes beyond binary hallucination detection by estimating whether each claim is supported by sufficient evidence, whether the decision is stable under evidence perturbation, and which failure mode is most likely.
 
 The project is designed for Windows 10/11, RTX 4060 8GB-class hardware, and CPU fallback. It does **not** call OpenAI, Anthropic, Gemini, Cohere, or any commercial LLM API.
+
+![SCAD-RAG overview](paper_assets/figures/scad_rag_overview.svg)
 
 ## Core Idea
 
@@ -29,6 +31,29 @@ Hard negatives are selected without gold labels in default inference. The select
 - FEVER and SciFact adapters for relation calibration and domain transfer.
 - Lightweight baselines: majority, lexical overlap, similarity-only, NLI-only, ESS-rule, SC-Gate-only, REFIND-inspired, and optional LettuceDetect adapter.
 - Threshold tuning, ablation, manual-check sampling, risk diagnostics, and LaTeX table export.
+
+## Paper-Facing Results
+
+RAGTruth is highly imbalanced, so Accuracy is reported as an auxiliary metric. Hallucination-F1, Binary Macro-F1, AUROC, and risk-error correlation are the main paper-facing metrics.
+
+| Method | Hall-F1 | Binary Macro-F1 | AUROC | Accuracy | Risk Corr. |
+|---|---:|---:|---:|---:|---:|
+| Majority | 0.1612 | 0.0806 | 0.5489 | 0.0876 | -0.0908 |
+| Lexical-overlap | 0.1712 | 0.1626 | 0.5489 | 0.1627 | 0.0182 |
+| Similarity-only | 0.1353 | 0.4239 | 0.5489 | **0.5684** | -0.4003 |
+| NLI-only | 0.1852 | 0.2741 | 0.5489 | 0.2824 | 0.0831 |
+| ESS-rule | 0.1839 | 0.2581 | 0.5489 | 0.2629 | 0.1073 |
+| SCAD-RAG-Rule | 0.1856 | 0.2510 | 0.5415 | 0.2462 | 0.1142 |
+| SCAD-RAG-Calibrated | **0.2028** | **0.4453** | **0.6061** | 0.5512 | **0.4503** |
+
+![RAGTruth main results](paper_assets/figures/ragtruth_main_results.svg)
+
+Additional paper-facing tables and SVG figures are available in [`paper_assets/`](paper_assets/):
+
+- [`paper_assets/tables/ragtruth_main_results.md`](paper_assets/tables/ragtruth_main_results.md)
+- [`paper_assets/tables/fever_relation_results.md`](paper_assets/tables/fever_relation_results.md)
+- [`paper_assets/tables/risk_diagnostics.md`](paper_assets/tables/risk_diagnostics.md)
+- [`paper_assets/figures/evidence_perturbation_probe.svg`](paper_assets/figures/evidence_perturbation_probe.svg)
 
 ## Installation
 
@@ -132,7 +157,7 @@ Generated runs, real datasets, and model files are ignored by Git.
 
 ## Repository Scope
 
-This repository contains the core research code, toy data, tests, configuration files, and experiment scripts. It does not include real RAGTruth/FEVER/SciFact files, generated experiment outputs, model checkpoints, or manuscript build artifacts.
+This repository contains the core research code, toy data, tests, configuration files, experiment scripts, and lightweight paper-facing assets. It does not include real RAGTruth/FEVER/SciFact files, generated experiment run folders, model checkpoints, or compiled manuscript PDFs.
 
 ## Citation
 
@@ -140,8 +165,8 @@ If this repository is useful, cite the accompanying manuscript:
 
 ```bibtex
 @misc{scadrag2026,
-  title = {SCAD-RAG: A Risk-Calibrated Expert System for Counterfactual Evidence Robustness Probing in Retrieval-Augmented Generation},
-  author = {Anonymous},
+  title = {SCAD-RAG: Risk-Calibrated Counterfactual Evidence Auditing for Knowledge-Grounded Retrieval-Augmented Generation},
+  author = {Wang, Yi and Shang, Wenqian},
   year = {2026},
   note = {Code: https://github.com/wangyi11111111/SCAD-RAG}
 }

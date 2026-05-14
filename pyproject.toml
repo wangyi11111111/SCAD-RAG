@@ -9,7 +9,10 @@ description = "Sufficient-Context and Counterfactual Audit for RAG Hallucination
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
-authors = [{ name = "SCAD-RAG Contributors" }]
+authors = [
+    { name = "Yi Wang", email = "wangy465@cuc.edu.cn" },
+    { name = "Wenqian Shang", email = "shangwenqian@cuc.edu.cn" },
+]
 dependencies = []
 
 [project.optional-dependencies]

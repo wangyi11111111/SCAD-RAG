@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+title: "SCAD-RAG: Risk-Calibrated Counterfactual Evidence Auditing for Knowledge-Grounded Retrieval-Augmented Generation"
+message: "If you use SCAD-RAG, please cite the accompanying manuscript or this software release."
+type: software
+authors:
+  - family-names: "Wang"
+    given-names: "Yi"
+    email: "wangy465@cuc.edu.cn"
+    affiliation: "Hainan International College, Communication University of China (CUC)"
+  - family-names: "Shang"
+    given-names: "Wenqian"
+    email: "shangwenqian@cuc.edu.cn"
+    affiliation: "School of Computer and Cyber Sciences, Communication University of China"
+repository-code: "https://github.com/wangyi11111111/SCAD-RAG"
+keywords:
+  - retrieval-augmented generation
+  - hallucination detection
+  - evidence auditing
+  - risk calibration
+  - fact verification
+license: MIT
+version: "0.1.0"
+date-released: "2026-05-14"
