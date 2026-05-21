@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-title: "SCAD-RAG: Risk-Calibrated Counterfactual Evidence Auditing for Knowledge-Grounded Retrieval-Augmented Generation"
+title: "SCAD-RAG: A Plug-and-Play Evidence-Sensitivity Auditing Framework for Lightweight and Risk-Aware RAG Hallucination Attribution"
 message: "If you use SCAD-RAG, please cite the accompanying manuscript or this software release."
 type: software
 authors:
@@ -11,13 +11,20 @@ authors:
     given-names: "Wenqian"
     email: "shangwenqian@cuc.edu.cn"
     affiliation: "School of Computer and Cyber Sciences, Communication University of China"
+  - family-names: "Yi"
+    given-names: "Tong"
+    email: "yitong@mailbox.gxnu.edu.cn"
+    affiliation: "The Key Lab of Education Blockchain and Intelligent Technology, Ministry of Education, Guangxi Normal University"
+  - family-names: "Zhu"
+    given-names: "Haibin"
+    email: "haibinz@nipissingu.ca"
+    affiliation: "Collaborative Systems Laboratory, Department of Computer Science and Mathematics, Nipissing University"
 repository-code: "https://github.com/wangyi11111111/SCAD-RAG"
 keywords:
   - retrieval-augmented generation
-  - hallucination detection
+  - hallucination attribution
   - evidence auditing
   - risk calibration
-  - fact verification
 license: MIT
 version: "0.1.0"
-date-released: "2026-05-14"
+date-released: "2026-05-22"
