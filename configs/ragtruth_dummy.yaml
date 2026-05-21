@@ -1,0 +1,51 @@
+use_dummy_models: true
+device: cpu
+dataset: ragtruth
+seed: 42
+batch_size: 4
+nli_batch_size: 4
+top_k: 5
+method: scad_rag
+output_dir: experiments/runs
+strict_no_gold_inference: true
+thresholds_path: null
+thresholds:
+  supported_threshold: 0.60
+  entailment_threshold: 0.50
+  contradiction_threshold: 0.55
+  low_relevance_threshold: 0.25
+  coverage_threshold: 0.35
+  neutral_threshold: 0.70
+  nli_reliability_threshold: 0.45
+  contradiction_min_coverage: 0.35
+  contradiction_max_neutral: 0.65
+  uncertainty_threshold: 0.65
+  risk_threshold: 0.70
+  min_dependency_delta: 0.10
+  min_hard_negative_gap: 0.10
+  max_hard_negative_candidates: 8
+  hard_negative_min_relevance: 0.25
+scad_weights:
+  alpha: 0.25
+  beta: 0.35
+  gamma: 0.20
+  delta: 0.10
+  eta: 0.10
+sufficient_context:
+  enabled: true
+counterfactual:
+  enable_removal: true
+  enable_hard_negative: true
+  enable_contradiction_probe: true
+  hard_negative_strategy: hard_negative
+risk_calibration:
+  enabled: true
+hard_negative:
+  allow_gold_labels: false
+evidence_chunking:
+  enabled: true
+  max_chunk_chars: 500
+  top_k_chunks: 5
+ragtruth:
+  raw_path: data/raw/ragtruth
+  processed_path: data/processed/ragtruth/processed.jsonl

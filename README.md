@@ -1,12 +1,12 @@
 # SCAD-RAG
 
-**SCAD-RAG: Risk-Calibrated Counterfactual Evidence Auditing for Knowledge-Grounded Retrieval-Augmented Generation**
+**SCAD-RAG: A Plug-and-Play Evidence-Sensitivity Auditing Framework for Lightweight and Risk-Aware RAG Hallucination Attribution**
 
-SCAD-RAG is a local, reproducible research codebase for claim-level hallucination diagnosis in retrieval-augmented generation (RAG). It goes beyond binary hallucination detection by estimating whether each claim is supported by sufficient evidence, whether the decision is stable under evidence perturbation, and which failure mode is most likely.
+SCAD-RAG is a local, reproducible research codebase for claim-level hallucination diagnosis in retrieval-augmented generation (RAG). It goes beyond binary hallucination detection by estimating whether each claim is supported by sufficient evidence, whether the decision is stable under evidence perturbation, and which failure mode is most likely. It can be used either as a standalone lightweight auditor or as a plug-and-play evidence-sensitivity layer attached to stronger open-source hallucination detectors.
 
 The project is designed for Windows 10/11, RTX 4060 8GB-class hardware, and CPU fallback. It does **not** call OpenAI, Anthropic, Gemini, Cohere, or any commercial LLM API.
 
-![SCAD-RAG overview](paper_assets/figures/scad_rag_overview.svg)
+![SCAD-RAG overview](paper_assets/figures/figure1_scad_rag_overview.png)
 
 ## Core Idea
 
@@ -30,7 +30,7 @@ Hard negatives are selected without gold labels in default inference. The select
 - RAGTruth downloader and adapter with field and conversion reports.
 - FEVER and SciFact adapters for relation calibration and domain transfer.
 - Lightweight baselines: majority, lexical overlap, similarity-only, NLI-only, ESS-rule, SC-Gate-only, REFIND-inspired, and optional LettuceDetect adapter.
-- Threshold tuning, ablation, manual-check sampling, risk diagnostics, and LaTeX table export.
+- Threshold tuning, ablation, manual-check sampling, risk diagnostics, external-detector fusion diagnostics, and LaTeX table export.
 
 ## Paper-Facing Results
 
@@ -53,6 +53,7 @@ Additional paper-facing tables and SVG figures are available in [`paper_assets/`
 - [`paper_assets/tables/ragtruth_main_results.md`](paper_assets/tables/ragtruth_main_results.md)
 - [`paper_assets/tables/fever_relation_results.md`](paper_assets/tables/fever_relation_results.md)
 - [`paper_assets/tables/risk_diagnostics.md`](paper_assets/tables/risk_diagnostics.md)
+- [`paper_assets/tables/external_detector_fusion.md`](paper_assets/tables/external_detector_fusion.md)
 - [`paper_assets/figures/evidence_perturbation_probe.svg`](paper_assets/figures/evidence_perturbation_probe.svg)
 
 ## Installation
@@ -112,6 +113,17 @@ Or run the scripted pipeline:
 .\scripts\run_ragtruth_500.ps1
 ```
 
+## External Detector Fusion
+
+SCAD-RAG can also be used as a post-hoc evidence-sensitivity layer for strong open-source detectors. The fast fusion CLI supports LettuceDetect and HHEM-style consistency detectors:
+
+```powershell
+python -m scad_rag.cli.run_external_fusion_fast --config configs/default.yaml --max_samples 500 --detector lettuce
+python -m scad_rag.cli.run_external_fusion_fast --config configs/default.yaml --max_samples 500 --detector hhem
+```
+
+On the RAGTruth-500 diagnostic setting, SCAD score fusion improves LettuceDetect Hall-F1 from 0.6082 to 0.6182 and AUROC from 0.8527 to 0.8824. For HHEM, SCAD score fusion improves AUROC, accuracy, Brier score, and selective-risk AUC, while SCAD risk reranking preserves the original thresholded Hall-F1 as a conservative fallback.
+
 ## Real-Model Smoke Test
 
 ```powershell
@@ -165,8 +177,8 @@ If this repository is useful, cite the accompanying manuscript:
 
 ```bibtex
 @misc{scadrag2026,
-  title = {SCAD-RAG: Risk-Calibrated Counterfactual Evidence Auditing for Knowledge-Grounded Retrieval-Augmented Generation},
-  author = {Wang, Yi and Shang, Wenqian},
+  title = {SCAD-RAG: A Plug-and-Play Evidence-Sensitivity Auditing Framework for Lightweight and Risk-Aware RAG Hallucination Attribution},
+  author = {Wang, Yi and Shang, Wenqian and Yi, Tong and Zhu, Haibin},
   year = {2026},
   note = {Code: https://github.com/wangyi11111111/SCAD-RAG}
 }
