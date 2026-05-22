@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-title: "SCAD-RAG: A Plug-and-Play Evidence-Sensitivity Auditing Framework for Lightweight and Risk-Aware RAG Hallucination Attribution"
+title: "SCAD-RAG: A Plug-and-Play Context-Sufficiency Auditing Framework for Lightweight and Risk-Aware RAG Hallucination Attribution"
 message: "If you use SCAD-RAG, please cite the accompanying manuscript or this software release."
 type: software
 authors:

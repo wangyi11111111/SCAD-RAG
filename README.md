@@ -1,6 +1,6 @@
 # SCAD-RAG
 
-**SCAD-RAG: A Plug-and-Play Evidence-Sensitivity Auditing Framework for Lightweight and Risk-Aware RAG Hallucination Attribution**
+**SCAD-RAG: A Plug-and-Play Context-Sufficiency Auditing Framework for Lightweight and Risk-Aware RAG Hallucination Attribution**
 
 SCAD-RAG is a local, reproducible research codebase for claim-level hallucination diagnosis in retrieval-augmented generation (RAG). It goes beyond binary hallucination detection by estimating whether each claim is supported by sufficient evidence, whether the decision is stable under evidence perturbation, and which failure mode is most likely. It can be used either as a standalone lightweight auditor or as a plug-and-play evidence-sensitivity layer attached to stronger open-source hallucination detectors.
 
@@ -177,7 +177,7 @@ If this repository is useful, cite the accompanying manuscript:
 
 ```bibtex
 @misc{scadrag2026,
-  title = {SCAD-RAG: A Plug-and-Play Evidence-Sensitivity Auditing Framework for Lightweight and Risk-Aware RAG Hallucination Attribution},
+  title = {SCAD-RAG: A Plug-and-Play Context-Sufficiency Auditing Framework for Lightweight and Risk-Aware RAG Hallucination Attribution},
   author = {Wang, Yi and Shang, Wenqian and Yi, Tong and Zhu, Haibin},
   year = {2026},
   note = {Code: https://github.com/wangyi11111111/SCAD-RAG}
