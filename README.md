@@ -6,7 +6,7 @@ SCAD-RAG is a local, reproducible research codebase for claim-level hallucinatio
 
 The project is designed for Windows 10/11, RTX 4060 8GB-class hardware, and CPU fallback. It does **not** call OpenAI, Anthropic, Gemini, Cohere, or any commercial LLM API.
 
-![SCAD-RAG overview](paper_assets/figures/scad_rag_overview.svg)
+![SCAD-RAG overview](paper_assets/figures/figure1_scad_rag_overview.png)
 
 ## Core Idea
 
@@ -46,8 +46,6 @@ RAGTruth is highly imbalanced, so Accuracy is reported as an auxiliary metric. H
 | ESS-rule | 0.1839 | 0.2581 | 0.5489 | 0.2629 | 0.1073 |
 | SCAD-RAG-Rule | 0.1856 | 0.2510 | 0.5415 | 0.2462 | 0.1142 |
 | SCAD-RAG-Calibrated | **0.2028** | **0.4453** | **0.6061** | 0.5512 | **0.4503** |
-
-![RAGTruth main results](paper_assets/figures/ragtruth_main_results.svg)
 
 ### Plug-in Fusion with External Detectors
 

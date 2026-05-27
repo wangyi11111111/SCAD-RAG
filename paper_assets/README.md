@@ -6,8 +6,7 @@ The files are intended for GitHub presentation and reproducibility notes. They d
 
 ## Figures
 
-- `figures/scad_rag_overview.svg`: compact framework overview for README rendering.
-- `figures/ragtruth_main_results.svg`: visual summary of the main RAGTruth metrics.
+- `figures/figure1_scad_rag_overview.png`: manuscript Figure 1 overview used for README rendering.
 - `figures/evidence_perturbation_probe.svg`: schematic of original, removal, and hard-negative evidence views.
 
 ## Result Tables
