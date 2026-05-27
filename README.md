@@ -1,23 +1,23 @@
 # SCAD-RAG
 
-**SCAD-RAG: A Plug-and-Play Context-Sufficiency Auditing Framework for Lightweight and Risk-Aware RAG Hallucination Attribution**
+**SCAD-RAG: Plug-and-Play Context-Sufficiency Auditing for RAG Hallucination Diagnosis**
 
-SCAD-RAG is a local, reproducible research codebase for claim-level hallucination diagnosis in retrieval-augmented generation (RAG). It goes beyond binary hallucination detection by estimating whether each claim is supported by sufficient evidence, whether the decision is stable under evidence perturbation, and which failure mode is most likely. It can be used either as a standalone lightweight auditor or as a plug-and-play evidence-sensitivity layer attached to stronger open-source hallucination detectors.
+SCAD-RAG is a local, reproducible research codebase for claim-level hallucination diagnosis in retrieval-augmented generation (RAG). It treats RAG hallucination diagnosis as a **plug-and-play context-sufficiency auditing problem** rather than only a closed binary detection problem. The same diagnostic features can run as a standalone lightweight auditor or be attached to strong external detectors as a post-hoc risk-ranking and attribution layer.
 
 The project is designed for Windows 10/11, RTX 4060 8GB-class hardware, and CPU fallback. It does **not** call OpenAI, Anthropic, Gemini, Cohere, or any commercial LLM API.
 
-![SCAD-RAG overview](paper_assets/figures/figure1_scad_rag_overview.png)
+![SCAD-RAG overview](paper_assets/figures/scad_rag_overview.svg)
 
 ## Core Idea
 
-RAG hallucination is not only a generation problem. It is an evidence-use problem across retrieval, evidence alignment, and generation. SCAD-RAG models this chain with four groups of signals:
+RAG hallucination is not only a generation problem. It is a context-use problem across retrieval, context alignment, and generation. SCAD-RAG models this chain with four groups of signals:
 
-- **Sufficient Context Gate:** estimates whether retrieved evidence is enough to judge a claim.
+- **Sufficient Context Gate:** estimates whether retrieved context is enough to judge a claim.
 - **SCAD Score:** combines relevance, entailment, contradiction, coverage, and sufficient-context signals.
-- **Operational Counterfactual Evidence Probing:** removes the best evidence, replaces it with a hard negative, and probes conflict to compute score-sensitivity diagnostics such as EDD and HNRG.
-- **Risk-Calibrated Attribution:** outputs hallucination decisions, attribution labels, uncertainty, NLI reliability, and risk scores.
+- **Finite-Difference Perturbation Probes:** remove the best context unit and replace it with a hard negative to compute score-sensitivity diagnostics such as EDD and HNRG.
+- **Risk-Aware Attribution and Fusion:** output hallucination decisions, attribution labels, uncertainty, NLI reliability, risk scores, and optional external-detector fusion features.
 
-The term counterfactual is used operationally: SCAD-RAG performs controlled evidence-set perturbations to test score robustness. It does not claim formal causal identification.
+The term counterfactual is used operationally: SCAD-RAG performs controlled context-set perturbations to test score robustness. It does not claim formal causal identification of the generator. The theoretical principle is finite-difference context-sensitivity: a reliable claim-level decision should be supported by sufficient context and should respond when that contextual basis is weakened.
 
 Hard negatives are selected without gold labels in default inference. The selector ranks semantically related candidates by relevance, weak entailment, low coverage, and contradiction tendency, then falls back to a low-relevance distractor if no suitable candidate exists. Contradiction attribution is guarded by an NLI reliability gate so high-neutral or low-coverage cases abstain instead of being forced into fine-grained labels.
 
@@ -29,8 +29,9 @@ Hard negatives are selected without gold labels in default inference. The select
 - Strict no-gold inference mode prevents label leakage at prediction time.
 - RAGTruth downloader and adapter with field and conversion reports.
 - FEVER and SciFact adapters for relation calibration and domain transfer.
-- Lightweight baselines: majority, lexical overlap, similarity-only, NLI-only, ESS-rule, SC-Gate-only, REFIND-inspired, and optional LettuceDetect adapter.
-- Threshold tuning, ablation, manual-check sampling, risk diagnostics, external-detector fusion diagnostics, and LaTeX table export.
+- Lightweight baselines: majority, lexical overlap, similarity-only, NLI-only, ESS-rule, SC-Gate-only, REFIND-inspired, and optional external detector adapters.
+- External detector fusion scripts for LettuceDetect, HHEM, and Osiris-style local/open hallucination detectors.
+- Threshold tuning, ablation, manual-check sampling, risk diagnostics, and LaTeX table export.
 
 ## Paper-Facing Results
 
@@ -48,12 +49,28 @@ RAGTruth is highly imbalanced, so Accuracy is reported as an auxiliary metric. H
 
 ![RAGTruth main results](paper_assets/figures/ragtruth_main_results.svg)
 
+### Plug-in Fusion with External Detectors
+
+SCAD-RAG can also be used as a post-hoc audit layer over strong open-source detectors. In RAGTruth-500 fusion diagnostics, SCAD score fusion improves selective-risk ranking and several detection metrics for LettuceDetect, HHEM, and Osiris-3B style detectors. Across the three detectors, SCAD-score fusion reduces selective-risk AUC by an average relative reduction of **39.51%** and improves accuracy by an average relative gain of **9.80%**.
+
+| System | Hall-F1 | AUROC | Accuracy | Brier | SR-AUC |
+|---|---:|---:|---:|---:|---:|
+| LettuceDetect | 0.6082 | 0.8527 | 0.9524 | 0.0521 | 0.0244 |
+| LD + SCAD-score | **0.6182** | **0.8824** | **0.9552** | **0.0508** | **0.0159** |
+| LD + SCAD-risk | 0.6082 | 0.8527 | 0.9524 | 0.0521 | 0.0162 |
+| HHEM | **0.2392** | 0.7463 | 0.8372 | 0.2974 | 0.0418 |
+| HHEM + SCAD-score | 0.1918 | **0.7529** | **0.8742** | **0.2373** | **0.0336** |
+| HHEM + SCAD-risk | **0.2392** | 0.7463 | 0.8372 | 0.2974 | 0.0418 |
+| Osiris-3B | **0.1960** | 0.6325 | 0.7143 | **0.2386** | 0.1016 |
+| Osiris + SCAD-score | 0.1720 | **0.7187** | **0.8905** | 0.2534 | **0.0365** |
+| Osiris + SCAD-risk | **0.1960** | 0.6325 | 0.7143 | **0.2386** | 0.0805 |
+
 Additional paper-facing tables and SVG figures are available in [`paper_assets/`](paper_assets/):
 
 - [`paper_assets/tables/ragtruth_main_results.md`](paper_assets/tables/ragtruth_main_results.md)
+- [`paper_assets/tables/external_detector_fusion.md`](paper_assets/tables/external_detector_fusion.md)
 - [`paper_assets/tables/fever_relation_results.md`](paper_assets/tables/fever_relation_results.md)
 - [`paper_assets/tables/risk_diagnostics.md`](paper_assets/tables/risk_diagnostics.md)
-- [`paper_assets/tables/external_detector_fusion.md`](paper_assets/tables/external_detector_fusion.md)
 - [`paper_assets/figures/evidence_perturbation_probe.svg`](paper_assets/figures/evidence_perturbation_probe.svg)
 
 ## Installation
@@ -113,17 +130,6 @@ Or run the scripted pipeline:
 .\scripts\run_ragtruth_500.ps1
 ```
 
-## External Detector Fusion
-
-SCAD-RAG can also be used as a post-hoc evidence-sensitivity layer for strong open-source detectors. The fast fusion CLI supports LettuceDetect and HHEM-style consistency detectors:
-
-```powershell
-python -m scad_rag.cli.run_external_fusion_fast --config configs/default.yaml --max_samples 500 --detector lettuce
-python -m scad_rag.cli.run_external_fusion_fast --config configs/default.yaml --max_samples 500 --detector hhem
-```
-
-On the RAGTruth-500 diagnostic setting, SCAD score fusion improves LettuceDetect Hall-F1 from 0.6082 to 0.6182 and AUROC from 0.8527 to 0.8824. For HHEM, SCAD score fusion improves AUROC, accuracy, Brier score, and selective-risk AUC, while SCAD risk reranking preserves the original thresholded Hall-F1 as a conservative fallback.
-
 ## Real-Model Smoke Test
 
 ```powershell
@@ -177,7 +183,7 @@ If this repository is useful, cite the accompanying manuscript:
 
 ```bibtex
 @misc{scadrag2026,
-  title = {SCAD-RAG: A Plug-and-Play Context-Sufficiency Auditing Framework for Lightweight and Risk-Aware RAG Hallucination Attribution},
+  title = {SCAD-RAG: Plug-and-Play Context-Sufficiency Auditing for RAG Hallucination Diagnosis},
   author = {Wang, Yi and Shang, Wenqian and Yi, Tong and Zhu, Haibin},
   year = {2026},
   note = {Code: https://github.com/wangyi11111111/SCAD-RAG}

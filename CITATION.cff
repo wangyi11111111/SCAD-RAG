@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-title: "SCAD-RAG: A Plug-and-Play Context-Sufficiency Auditing Framework for Lightweight and Risk-Aware RAG Hallucination Attribution"
+title: "SCAD-RAG: Plug-and-Play Context-Sufficiency Auditing for RAG Hallucination Diagnosis"
 message: "If you use SCAD-RAG, please cite the accompanying manuscript or this software release."
 type: software
 authors:
@@ -22,9 +22,11 @@ authors:
 repository-code: "https://github.com/wangyi11111111/SCAD-RAG"
 keywords:
   - retrieval-augmented generation
-  - hallucination attribution
-  - evidence auditing
+  - hallucination detection
+  - context sufficiency
+  - detector fusion
   - risk calibration
+  - fact verification
 license: MIT
 version: "0.1.0"
-date-released: "2026-05-22"
+date-released: "2026-05-14"

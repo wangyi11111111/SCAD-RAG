@@ -5,13 +5,15 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "scad-rag"
 version = "0.1.0"
-description = "Sufficient-Context and Counterfactual Audit for RAG Hallucination Attribution."
+description = "Plug-and-play context-sufficiency auditing for RAG hallucination diagnosis."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
 authors = [
     { name = "Yi Wang", email = "wangy465@cuc.edu.cn" },
     { name = "Wenqian Shang", email = "shangwenqian@cuc.edu.cn" },
+    { name = "Tong Yi", email = "yitong@mailbox.gxnu.edu.cn" },
+    { name = "Haibin Zhu", email = "haibinz@nipissingu.ca" },
 ]
 dependencies = []
 

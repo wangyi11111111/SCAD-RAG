@@ -29,12 +29,22 @@ def main() -> int:
     base = load_config(args.config)
     if args.dataset:
         base["dataset"] = args.dataset
-    if str(base.get("dataset", "")) == "ragtruth":
+    dataset = str(base.get("dataset", ""))
+    if dataset == "ragtruth":
         base.setdefault("ragtruth", {})
         base["ragtruth"]["split"] = "train" if args.split == "validation" else args.split
         base["ragtruth"]["requested_split"] = args.split
         base["ragtruth"]["processed_path"] = f"data/processed/ragtruth/{args.split}_processed.jsonl"
         prepare_dataset(base, "ragtruth", max_samples=args.max_samples)
+    elif dataset:
+        # For labelled transfer datasets such as SciFact, keep the public dev
+        # split untouched for evaluation and tune on the train split.
+        base.setdefault(dataset, {})
+        calibration_split = "train" if args.split == "validation" else args.split
+        base[dataset]["split"] = calibration_split
+        base[dataset]["requested_split"] = args.split
+        base[dataset]["processed_path"] = f"data/processed/{dataset}/{calibration_split}_processed.jsonl"
+        prepare_dataset(base, dataset, max_samples=args.max_samples)
     root = ensure_dir(Path(base.get("output_dir", "experiments/runs")) / f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_threshold_tuning")
     feature_cache = run_experiment(base, "scad_rag", root / "feature_cache", max_samples=args.max_samples)["predictions"]
     if not feature_cache:
@@ -56,7 +66,8 @@ def main() -> int:
             best_config = deepcopy(cfg["thresholds"])
     write_csv(root / "threshold_tuning_report.csv", rows)
     dump_yaml(best_config or base.get("thresholds", {}), root / "best_thresholds.yaml")
-    (root / "threshold_tuning_report.md").write_text(_report(rows, best_config or {}, best_score, args.split, base.get("ragtruth", {}).get("split", args.split)), encoding="utf-8")
+    actual_split = base.get(dataset, {}).get("split", args.split) if dataset else args.split
+    (root / "threshold_tuning_report.md").write_text(_report(rows, best_config or {}, best_score, args.split, actual_split), encoding="utf-8")
     (root / "latest_thresholds.txt").write_text(str(root / "best_thresholds.yaml"), encoding="utf-8")
     print(f"Wrote threshold tuning results to {root}")
     return 0
@@ -114,7 +125,7 @@ def _report(rows: list[dict], best: dict, best_score: float, requested_split: st
         "",
         f"Requested split: {requested_split}",
         f"Actual calibration split: {actual_split}",
-        "RAGTruth public data has no validation split; `validation` is mapped to train-side calibration and never to test.",
+        "`validation` requests are mapped to a train-side calibration split when needed, and never to a held-out test/evaluation split.",
         f"Best hallucination_f1: {best_score:.4f}",
         "",
         "## Best Thresholds",
