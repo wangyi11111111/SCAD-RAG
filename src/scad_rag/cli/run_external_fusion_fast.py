@@ -32,7 +32,7 @@ def main() -> int:
     parser.add_argument("--top_k", type=int, default=2)
     parser.add_argument("--pool_limit", type=int, default=80)
     parser.add_argument("--output_dir", default=None)
-    parser.add_argument("--detector", choices=["lettuce", "hhem", "osiris"], default="lettuce")
+    parser.add_argument("--detector", choices=["lettuce", "hhem", "osiris", "minicheck"], default="lettuce")
     parser.add_argument("--detector_batch_size", type=int, default=8)
     parser.add_argument("--lettuce_model_path", default="KRLabsOrg/lettucedect-base-modernbert-en-v1")
     parser.add_argument("--hhem_model_path", default="vectara/hallucination_evaluation_model")
@@ -40,6 +40,9 @@ def main() -> int:
     parser.add_argument("--osiris_gguf_repo", default="mradermacher/Qwen2.5-Osiris-3B-Instruct-GGUF")
     parser.add_argument("--osiris_gguf_file", default="Qwen2.5-Osiris-3B-Instruct.Q4_K_M.gguf")
     parser.add_argument("--osiris_max_input_chars", type=int, default=2200)
+    parser.add_argument("--minicheck_model_name", default="flan-t5-large")
+    parser.add_argument("--minicheck_cache_dir", default="ckpts/minicheck")
+    parser.add_argument("--minicheck_enable_prefix_caching", action="store_true")
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
@@ -74,10 +77,14 @@ def main() -> int:
         args.osiris_model_path,
         args.osiris_gguf_repo,
         args.osiris_gguf_file,
+        args.minicheck_model_name,
+        args.minicheck_cache_dir,
+        args.minicheck_enable_prefix_caching,
     )
     rows = []
     hhem_pairs: list[tuple[str, str]] = []
     osiris_pairs: list[tuple[str, str]] = []
+    minicheck_pairs: list[tuple[str, str]] = []
     for idx, claim in enumerate(claims, start=1):
         feature_claim = inference_claim_view(claim, bool(config.get("strict_no_gold_inference", True)))
         audit = audit_claim(
@@ -98,6 +105,9 @@ def main() -> int:
         elif args.detector == "osiris":
             detector_score = 0.0
             osiris_pairs.append((audit.best_evidence_text or "", claim.claim_text))
+        elif args.detector == "minicheck":
+            detector_score = 0.0
+            minicheck_pairs.append((audit.best_evidence_text or "", claim.claim_text))
         else:
             detector_score = _external_score(detector, claim.question, claim.claim_text, audit.best_evidence_text)
         row = _row_from_audit(claim, audit, detector_score, args.detector)
@@ -111,6 +121,15 @@ def main() -> int:
             row["detector_score"] = score
     if args.detector == "osiris":
         scores = _osiris_scores_batch(detector, osiris_pairs, max(1, args.detector_batch_size), args.osiris_max_input_chars)
+        for row, score in zip(rows, scores):
+            row["external_score"] = score
+            row["detector_score"] = score
+    if args.detector == "minicheck":
+        scores = _minicheck_scores_batch(
+            detector["scorer"],
+            minicheck_pairs,
+            max(1, args.detector_batch_size),
+        )
         for row, score in zip(rows, scores):
             row["external_score"] = score
             row["detector_score"] = score
@@ -154,6 +173,9 @@ def _load_external_detector(
     osiris_model_path: str,
     osiris_gguf_repo: str,
     osiris_gguf_file: str,
+    minicheck_model_name: str,
+    minicheck_cache_dir: str,
+    minicheck_enable_prefix_caching: bool,
 ) -> dict[str, Any]:
     """Load the selected external detector."""
     if detector == "lettuce":
@@ -162,6 +184,8 @@ def _load_external_detector(
         return {"type": "hhem", "model": _load_hhem(hhem_model_path)}
     if detector == "osiris":
         return _load_osiris(osiris_model_path, osiris_gguf_repo, osiris_gguf_file)
+    if detector == "minicheck":
+        return _load_minicheck(minicheck_model_name, minicheck_cache_dir, minicheck_enable_prefix_caching)
     raise ValueError(f"Unsupported detector: {detector}")
 
 
@@ -240,6 +264,25 @@ def _load_osiris_gguf(repo_id: str, filename: str) -> dict[str, Any]:
         raise RuntimeError(f"Could not load Osiris GGUF model '{repo_id}/{filename}': {exc}") from exc
 
 
+def _load_minicheck(model_name: str, cache_dir: str, enable_prefix_caching: bool) -> dict[str, Any]:
+    """Load MiniCheck as a local fact-checking detector."""
+    try:
+        from minicheck.minicheck import MiniCheck  # type: ignore
+
+        scorer = MiniCheck(
+            model_name=model_name,
+            cache_dir=cache_dir,
+            enable_prefix_caching=enable_prefix_caching,
+        )
+        return {"type": "minicheck", "scorer": scorer, "model_name": model_name, "cache_dir": cache_dir}
+    except Exception as exc:
+        raise RuntimeError(
+            "Could not load MiniCheck. Install it with: "
+            "\"pip install 'minicheck @ git+https://github.com/Liyan06/MiniCheck.git@main'\" "
+            f"and retry. Original error: {exc}"
+        ) from exc
+
+
 def _external_score(detector: dict[str, Any], question: str, claim: str, evidence: str) -> float:
     """Return a hallucination-oriented external detector score."""
     kind = str(detector.get("type"))
@@ -248,6 +291,8 @@ def _external_score(detector: dict[str, Any], question: str, claim: str, evidenc
         return _lettuce_score(model, question, claim, evidence)
     if kind == "hhem":
         return _hhem_score(model, claim, evidence)
+    if kind == "minicheck":
+        return _minicheck_scores_batch(detector["scorer"], [(evidence, claim)], 1)[0]
     if kind in {"osiris", "osiris_gguf"}:
         return _osiris_scores_batch(detector, [(evidence, claim)], 1, 2200)[0]
     raise ValueError(f"Unsupported detector type: {kind}")
@@ -306,6 +351,30 @@ def _hhem_scores_batch(model: Any, pairs: list[tuple[str, str]], batch_size: int
             for evidence, claim in prepared:
                 scores.append(_hhem_score(model, claim, evidence))
         print(f"Scored HHEM {min(start + batch_size, len(pairs))}/{len(pairs)} claims")
+    return scores
+
+
+def _minicheck_scores_batch(scorer: Any, pairs: list[tuple[str, str]], batch_size: int) -> list[float]:
+    """Return MiniCheck hallucination probabilities as 1 - support probability."""
+    scores: list[float] = []
+    for start in range(0, len(pairs), batch_size):
+        batch = pairs[start : start + batch_size]
+        docs = [doc for doc, _ in batch]
+        claims = [claim for _, claim in batch]
+        try:
+            pred_label, raw_prob, *_ = scorer.score(docs=docs, claims=claims)
+        except TypeError:
+            pred_label, raw_prob, *_ = scorer.score(doc=docs, claims=claims)
+        except Exception as exc:
+            raise RuntimeError(f"MiniCheck scoring failed for batch starting at {start}: {exc}") from exc
+        if isinstance(raw_prob, (int, float)):
+            raw_prob = [raw_prob] * len(batch)
+        for prob in raw_prob:
+            try:
+                scores.append(1.0 - float(prob))
+            except (TypeError, ValueError):
+                scores.append(0.5)
+        print(f"Scored MiniCheck {min(start + batch_size, len(pairs))}/{len(pairs)} claims")
     return scores
 
 
@@ -520,8 +589,8 @@ def _run_fusion(rows: list[dict[str, Any]], seed: int, detector_label: str) -> d
         "n_test": len(test),
         "ld_threshold": ld_th,
         "scad_threshold": scad_th,
-        "fusion_weights": {"lettuce": w_ld, "scad_score": w_scad, "risk": w_risk, "low_dependency": w_dep, "threshold": fusion_th},
-        "risk_rerank_weight_lettuce": risk_w,
+        "fusion_weights": {"external_detector": w_ld, "scad_score": w_scad, "risk": w_risk, "low_dependency": w_dep, "threshold": fusion_th},
+        "risk_rerank_weight_external_detector": risk_w,
         "summary": summary,
         "predictions": systems,
     }
@@ -585,7 +654,7 @@ def _report_md(result: dict[str, Any]) -> str:
         f"External detector threshold: {result['ld_threshold']}",
         f"SCAD threshold: {result['scad_threshold']}",
         f"Fusion weights: {result['fusion_weights']}",
-        f"Risk rerank external-detector weight: {result['risk_rerank_weight_lettuce']}",
+        f"Risk rerank external-detector weight: {result['risk_rerank_weight_external_detector']}",
         "",
         "| System | Hall-F1 | AUROC | ECE | Brier | Risk-Cov Acc AUC | Selective Risk AUC |",
         "|---|---:|---:|---:|---:|---:|---:|",
@@ -608,6 +677,8 @@ def _detector_label(detector: str) -> str:
         return "LettuceDetect"
     if detector == "hhem":
         return "HHEM"
+    if detector == "minicheck":
+        return "MiniCheck"
     return "Osiris-3B"
 
 

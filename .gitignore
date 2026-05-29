@@ -6,6 +6,7 @@ build/
 dist/
 .venv/
 venv/
+ckpts/
 *.log
 *.tmp
 *.pt

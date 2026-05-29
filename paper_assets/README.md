@@ -12,7 +12,7 @@ The files are intended for GitHub presentation and reproducibility notes. They d
 ## Result Tables
 
 - `tables/ragtruth_main_results.md`: full RAGTruth main comparison.
-- `tables/external_detector_fusion.md`: RAGTruth-500 plug-in fusion diagnostics for LettuceDetect, HHEM, and Osiris-3B style detectors.
+- `tables/external_detector_fusion.md`: RAGTruth-500 plug-in fusion diagnostics for LettuceDetect, HHEM, Osiris-3B, and MiniCheck style detectors.
 - `tables/fever_relation_results.md`: FEVER relation-attribution result table.
 - `tables/risk_diagnostics.md`: EDD/HNRG and risk-calibration diagnostics.
 

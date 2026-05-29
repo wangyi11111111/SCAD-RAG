@@ -30,7 +30,7 @@ Hard negatives are selected without gold labels in default inference. The select
 - RAGTruth downloader and adapter with field and conversion reports.
 - FEVER and SciFact adapters for relation calibration and domain transfer.
 - Lightweight baselines: majority, lexical overlap, similarity-only, NLI-only, ESS-rule, SC-Gate-only, REFIND-inspired, and optional external detector adapters.
-- External detector fusion scripts for LettuceDetect, HHEM, and Osiris-style local/open hallucination detectors.
+- External detector fusion scripts for LettuceDetect, HHEM, Osiris, and MiniCheck-style local/open hallucination detectors.
 - Threshold tuning, ablation, manual-check sampling, risk diagnostics, and LaTeX table export.
 
 ## Paper-Facing Results
@@ -49,7 +49,7 @@ RAGTruth is highly imbalanced, so Accuracy is reported as an auxiliary metric. H
 
 ### Plug-in Fusion with External Detectors
 
-SCAD-RAG can also be used as a post-hoc audit layer over strong open-source detectors. In RAGTruth-500 fusion diagnostics, SCAD score fusion improves selective-risk ranking and several detection metrics for LettuceDetect, HHEM, and Osiris-3B style detectors. Across the three detectors, SCAD-score fusion reduces selective-risk AUC by an average relative reduction of **39.51%** and improves accuracy by an average relative gain of **9.80%**.
+SCAD-RAG can also be used as a post-hoc audit layer over strong open-source detectors. In RAGTruth-500 fusion diagnostics, SCAD score fusion improves selective-risk ranking and several detection metrics for LettuceDetect, HHEM, Osiris-3B, and MiniCheck style detectors. Across the four detectors, SCAD-score fusion reduces selective-risk AUC by an average relative reduction of **31.62%** and improves accuracy by an average relative gain of **7.86%**.
 
 | System | Hall-F1 | AUROC | Accuracy | Brier | SR-AUC |
 |---|---:|---:|---:|---:|---:|
@@ -62,6 +62,9 @@ SCAD-RAG can also be used as a post-hoc audit layer over strong open-source dete
 | Osiris-3B | **0.1960** | 0.6325 | 0.7143 | **0.2386** | 0.1016 |
 | Osiris + SCAD-score | 0.1720 | **0.7187** | **0.8905** | 0.2534 | **0.0365** |
 | Osiris + SCAD-risk | **0.1960** | 0.6325 | 0.7143 | **0.2386** | 0.0805 |
+| MiniCheck | 0.2222 | 0.7606 | 0.7872 | 0.3691 | 0.0503 |
+| MiniCheck + SCAD-score | **0.2264** | **0.7643** | **0.8032** | **0.3020** | **0.0463** |
+| MiniCheck + SCAD-risk | 0.2222 | 0.7606 | 0.7872 | 0.3691 | 0.0531 |
 
 Additional paper-facing tables and SVG figures are available in [`paper_assets/`](paper_assets/):
 
